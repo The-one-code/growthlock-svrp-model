@@ -1,0 +1,16 @@
+[theme]
+# Primary accent — used on slider thumbs, active radio buttons, metric deltas.
+# Matches the green chart line in the Model tab for visual coherence.
+primaryColor = "#1D9E75"
+
+# Main page background
+backgroundColor = "#FFFFFF"
+
+# Sidebar + cards background
+secondaryBackgroundColor = "#F4F6F8"
+
+# Body text
+textColor = "#1F2937"
+
+# Font
+font = "sans serif"
