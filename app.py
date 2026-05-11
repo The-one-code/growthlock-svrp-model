@@ -46,7 +46,7 @@ def per_cycle_economics(
         balance via UCC enforcement.
       - Total returned to the deal:
             I * F * [1 - D*(1-T)*(1-R)]
-      - Servicing fee is 3% of *invested capital* (per operator clarification, May 9 2026):
+      - Servicing fee is 3% of *invested capital* (per May 9 2026 clarification):
             I * SF
 
     Fee allocation modes:
@@ -223,7 +223,7 @@ with st.sidebar:
         min_value=0, max_value=30,
         value=10, step=1,
         format="%d%%",
-        help="Industry baseline per the operator's funders: 10%. SVRP marketing model: 0%.",
+        help="Industry baseline reported by the funders: 10%. SVRP marketing model assumes 0%.",
     )
     default_rate = default_rate_pct / 100
 
@@ -243,8 +243,8 @@ with st.sidebar:
         min_value=0, max_value=100,
         value=50, step=5,
         format="%d%%",
-        help="The operator's funders cite 50–80% on actively pursued UCC enforcement. "
-             "50% = conservative end of their range.",
+        help="Funders cite 50–80% recovery on actively pursued UCC enforcement. "
+             "50% = conservative end of that range.",
     )
     recovery_rate = recovery_rate_pct / 100
 
@@ -254,8 +254,8 @@ with st.sidebar:
         min_value=0.00, max_value=5.00,
         value=3.00, step=0.25,
         format="%.2f%%",
-        help="Per operator clarification (May 9 2026): up to 3% of syndicated amount. "
-             "SVRP doc range: 1.75–4% pass-through.",
+        help="Funder charges up to 3% of the syndicated amount (per May 9 2026 "
+             "clarification). SVRP doc range: 1.75–4% pass-through.",
     )
     servicing_fee = servicing_fee_pct / 100
     fee_allocation_label = st.radio(
@@ -263,19 +263,20 @@ with st.sidebar:
         options=["Pre-split (partner-fair)", "Investor-only (per prospectus math)"],
         index=0,
         help="Pre-split: fee comes out of partnership pool before the 50/50 split — "
-             "GrowthLock pays half. Investor-only: 50/50 split first, then full fee "
-             "from investor — GrowthLock pays zero, investor's effective split drops "
-             "below 50%. The prospectus's worked example in its financial-model section "
-             "(20.3, 'Net Return After Fees') uses the second interpretation. "
-             "Worth pinning the operator down on which one is actually contractual.",
+             "both sides bear half the fee. Investor-only: 50/50 split first, then "
+             "full fee from investor only — GrowthLock pays nothing, investor's effective "
+             "split drops below 50%. The prospectus's worked example in its "
+             "financial-model section (subsection 20.3, 'Net Return After Fees') uses "
+             "the investor-only interpretation. Which one is contractual is the open "
+             "question — see the Discrepancies tab.",
     )
     fee_allocation = "pre_split" if fee_allocation_label.startswith("Pre") else "investor_only"
 
     st.markdown("---")
     st.markdown("**Default settings = conservative case:**")
     st.markdown(
-        "- 10% default rate (the operator's stated industry baseline)\n"
-        "- 50% recovery (low end of the operator's 50–80% range)\n"
+        "- 10% default rate (stated industry baseline)\n"
+        "- 50% recovery (low end of the 50–80% funder-reported range)\n"
         "- 50% payments collected before default (mid-cycle)\n"
         "- 3% servicing fee on invested capital\n"
         "- 1.45 factor rate, 110-day cycle"
@@ -307,9 +308,10 @@ marketing_annual = annualized(
 )
 
 # -------- TABS --------
-tab_model, tab_sens, tab_disc = st.tabs([
+tab_model, tab_sens, tab_loss, tab_disc = st.tabs([
     "📊 Model",
     "📈 Sensitivity",
+    "🛡️ Loss-Sharing",
     "⚠️ Discrepancies",
 ])
 
@@ -563,124 +565,368 @@ with tab_sens:
     )
 
 # ============== TAB 3: GROWTHLOCK ACTUALS ==============
-# ============== TAB 4: DISCREPANCIES ==============
-with tab_disc:
-    st.subheader("Documented discrepancies — prospectus materials vs. conservative model")
+# ============== TAB 3: LOSS-SHARING MECHANISMS ==============
+with tab_loss:
+    st.subheader("Loss-sharing mechanisms — modeling investor protection")
     st.caption(
-        "These are the gaps between what the SVRP prospectus and verbal Q&A "
-        "communicate, and what a conservative read of the same materials produces. "
-        "Each one should be resolved in writing before signing."
+        "Modeling two structural mechanisms that could be added to the syndication "
+        "agreement to address the asymmetric loss allocation in the current structure. "
+        "Both draw from revenue GrowthLock has already earned rather than requiring "
+        "fresh capital."
     )
 
-    st.markdown("##### 1. Servicing fee allocation — the biggest discrepancy")
+    st.markdown("##### How the two mechanisms work")
+    st.markdown(
+        "**Mechanism A — Chain-profit clawback.** A 'chain' is a continuous sequence "
+        "of renewals on a single borrower (not separate funding events with the same "
+        "borrower after a full payoff and gap — those start new chains). If a renewal "
+        "in the chain defaults, GrowthLock rebates a percentage of the syndication "
+        "profit they collected from earlier renewals in that same chain back to the "
+        "affected investor.\n\n"
+        "**Mechanism B — Origination commission rebate.** GrowthLock earns origination "
+        "commissions from the funding bank on every deal that funds, separate from the "
+        "syndication economics (per Q&A disclosure). For any defaulted deal, GrowthLock "
+        "rebates a percentage of the commission they earned to the affected investor.\n\n"
+        "**The two cover different failure modes.** B alone helps when a first-cycle "
+        "deal defaults (no prior chain history to claw back from). A kicks in when a "
+        "renewal default lands later in a chain (real accumulated profit exists). "
+        "Combined, they cover both scenarios."
+    )
+
+    st.markdown("---")
+    st.markdown("##### Scenario inputs")
+
+    cli1, cli2 = st.columns(2)
+    with cli1:
+        chain_length = st.slider(
+            "Chain length (total cycles, with the last one defaulting)",
+            min_value=1, max_value=6, value=3,
+            help="Number of cycles in the chain. Cycle N is the default; cycles 1 "
+                 "through N-1 are successful. Chain length 1 = first-cycle default "
+                 "(no prior renewals, Mechanism A has nothing to claw back).",
+        )
+        origination_commission_pct = st.slider(
+            "Origination commission rate",
+            min_value=0.0, max_value=10.0, value=6.0, step=0.5,
+            format="%.1f%%",
+            help="Percentage of advance amount the funder pays GrowthLock on "
+                 "origination. Per Q&A, typically 6–10% on MCAs, with volume bonuses "
+                 "of 1–5 additional points on top.",
+        )
+    with cli2:
+        mechanism_a_pct = st.slider(
+            "Mechanism A — clawback % of GL chain profit",
+            min_value=0, max_value=100, value=50, step=10,
+            format="%d%%",
+            help="Percentage of GrowthLock's accumulated syndication profit from the "
+                 "successful cycles in the chain that is rebated to the investor on "
+                 "default of a subsequent renewal. Transfer is capped at the "
+                 "investor's actual loss.",
+        )
+        mechanism_b_pct = st.slider(
+            "Mechanism B — rebate % of origination commission on defaulted cycle",
+            min_value=0, max_value=100, value=100, step=10,
+            format="%d%%",
+            help="Percentage of GrowthLock's origination commission on the defaulted "
+                 "deal that is rebated to the investor. 100% = full rebate of "
+                 "commission earned on that one deal.",
+        )
+
+    # ---- Compute scenarios ----
+    success_cycle = per_cycle_economics(
+        investment, factor_rate, 0.0, 0.0, 1.0,
+        servicing_fee, fee_allocation,
+    )
+    investor_profit_per_cycle = success_cycle["investor_pnl"]
+    gl_profit_per_cycle = success_cycle["growthlock_pnl"]
+
+    default_cycle = per_cycle_economics(
+        investment, factor_rate, 1.0, default_timing, recovery_rate,
+        servicing_fee, fee_allocation,
+    )
+    cycle_n_pnl = default_cycle["investor_pnl"]
+    investor_loss = max(0.0, -cycle_n_pnl)
+
+    successful_cycles = chain_length - 1
+    accumulated_investor_profit = successful_cycles * investor_profit_per_cycle
+    accumulated_gl_profit = successful_cycles * gl_profit_per_cycle
+    origination_commission_per_cycle = (origination_commission_pct / 100.0) * investment
+
+    mech_a_transfer = min(
+        (mechanism_a_pct / 100.0) * accumulated_gl_profit,
+        investor_loss,
+    )
+    remaining_after_a = max(0.0, investor_loss - mech_a_transfer)
+    mech_b_transfer = min(
+        (mechanism_b_pct / 100.0) * origination_commission_per_cycle,
+        remaining_after_a,
+    )
+
+    mech_a_alone = min(
+        (mechanism_a_pct / 100.0) * accumulated_gl_profit,
+        investor_loss,
+    )
+    mech_b_alone = min(
+        (mechanism_b_pct / 100.0) * origination_commission_per_cycle,
+        investor_loss,
+    )
+
+    unprotected_net = accumulated_investor_profit + cycle_n_pnl
+    with_a_net = unprotected_net + mech_a_alone
+    with_b_net = unprotected_net + mech_b_alone
+    combined_net = unprotected_net + mech_a_transfer + mech_b_transfer
+
+    st.markdown("---")
+    st.markdown("##### Scenario summary")
+
+    s1, s2, s3 = st.columns(3)
+    s1.metric(
+        "Investor profit from prior cycles",
+        f"${accumulated_investor_profit:,.0f}",
+        delta=(f"from {successful_cycles} successful cycle"
+               + ("s" if successful_cycles != 1 else "")
+               + " before default") if successful_cycles > 0
+              else "no prior cycles",
+    )
+    if cycle_n_pnl >= 0:
+        s2.metric(
+            "Cycle N (default) net",
+            f"${cycle_n_pnl:,.0f}",
+            delta="positive — payments + recovery covered capital + fee",
+        )
+    else:
+        s2.metric(
+            "Cycle N (default) loss",
+            f"-${investor_loss:,.0f}",
+        )
+    s3.metric(
+        "GL chain profit before default",
+        f"${accumulated_gl_profit:,.0f}",
+        delta=(f"50% of partnership profit × {successful_cycles}"
+               if successful_cycles > 0 else "no chain history"),
+    )
+
+    if cycle_n_pnl >= 0:
+        st.info(
+            "**No loss in this scenario** — at the current default-timing and recovery "
+            "assumptions, the defaulted cycle still produced a positive net (collected "
+            "payments plus recovery exceeded capital plus fee). Mechanisms A and B "
+            "don't trigger because there's no loss to cover. Dial default timing or "
+            "recovery lower in the sidebar to model a scenario where the mechanisms "
+            "actually engage — try default timing 10–25% with recovery 20–40%."
+        )
+    else:
+        st.markdown("---")
+        st.markdown("##### Mechanism impact")
+
+        m1, m2 = st.columns(2)
+        with m1:
+            st.metric(
+                "Mechanism A transfer (combined)",
+                f"${mech_a_transfer:,.0f}",
+                delta=f"{mechanism_a_pct}% of GL's ${accumulated_gl_profit:,.0f}",
+            )
+            st.caption(
+                f"Capped at the investor's ${investor_loss:,.0f} loss. "
+                f"On a first-cycle default (chain length = 1), A has no chain history "
+                f"to draw from."
+            )
+        with m2:
+            st.metric(
+                "Mechanism B transfer (combined)",
+                f"${mech_b_transfer:,.0f}",
+                delta=f"{mechanism_b_pct}% of ${origination_commission_per_cycle:,.0f} commission",
+            )
+            st.caption(
+                f"Origination commission on the defaulted cycle: "
+                f"${origination_commission_per_cycle:,.0f} "
+                f"({origination_commission_pct:.1f}% × ${investment:,.0f}). Applied "
+                f"after A, capped at remaining loss."
+            )
+
+        st.markdown("---")
+        st.markdown("##### Final investor position — unprotected vs. protected")
+
+        scenarios = ["Unprotected", "With Mechanism A only", "With Mechanism B only", "With A + B combined"]
+        values = [unprotected_net, with_a_net, with_b_net, combined_net]
+        colors = ["#DC2626" if v < 0 else "#1D9E75" for v in values]
+
+        fig = go.Figure(go.Bar(
+            x=scenarios,
+            y=values,
+            text=[f"${v:,.0f}" for v in values],
+            textposition="outside",
+            marker_color=colors,
+        ))
+        fig.add_hline(y=0, line_color="gray", line_width=1)
+        fig.update_layout(
+            height=420,
+            margin=dict(l=10, r=10, t=30, b=10),
+            yaxis_title="Investor net position across full chain ($)",
+            yaxis_tickformat="$,.0f",
+            xaxis_title="",
+            showlegend=False,
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+        improvement = combined_net - unprotected_net
+        pct_improvement = (improvement / investor_loss * 100) if investor_loss > 0 else 0
+        if improvement > 0:
+            st.success(
+                f"**Combined A + B improves the investor's net position by "
+                f"${improvement:,.0f}** in this scenario — recovering "
+                f"{pct_improvement:.0f}% of the cycle-N loss. Net position moves from "
+                f"${unprotected_net:,.0f} (unprotected) to ${combined_net:,.0f} "
+                f"(with both mechanisms)."
+            )
+
+    st.markdown("---")
+    st.markdown("##### Notes on the mechanics")
+    st.markdown(
+        "- **Cohort scope.** As discussed, this would apply to a limited early cohort "
+        "(e.g., the first five investors at \\$100K+ minimum) rather than every "
+        "investor. Keeps GrowthLock's maximum exposure bounded and rewards early "
+        "adopters specifically.\n"
+        "- **Commission clawback window.** Per Q&A, the funder has a 30–45 day "
+        "clawback window on origination commissions. If a default occurs within that "
+        "window, the commission is returned to the funder and Mechanism B has nothing "
+        "to rebate. For default timing above ~30% on a 110-day cycle, the commission "
+        "is retained and B applies. The model doesn't enforce this — set Mechanism B "
+        "to 0% to simulate an in-window default.\n"
+        "- **Chain definition matters.** A chain is a continuous renewal sequence. "
+        "If a borrower pays off in full and comes back later for a new deal, that "
+        "starts a new chain — Mechanism A's clawback applies only within a single "
+        "chain.\n"
+        "- **Caps.** Each mechanism's transfer is capped at the investor's actual "
+        "loss, so neither mechanism overpays. The combined version applies A first, "
+        "then B against the remaining loss after A."
+    )
+
+
+# ============== TAB 4: DISCREPANCIES ==============
+with tab_disc:
+    st.subheader("Discrepancies — prospectus materials vs. a conservative read")
+    st.caption(
+        "Gaps between what the prospectus and verbal Q&A communicate, and what a "
+        "conservative read of the same materials produces."
+    )
+
+    st.markdown("##### 1. Servicing fee allocation")
     st.markdown(
         "The prospectus's financial-model section (subsection 20.3, 'Net Return After "
-        "Fees') is the only place in the entire document where the actual return math "
-        "is worked out with dollar figures. Here is the literal example, verbatim:\n\n"
+        "Fees') is the only place in the document where the return math is worked "
+        "out with dollar figures. The literal example, verbatim:\n\n"
         "> Assume: Servicing Fee: 3% (\\$3,000)  \n"
         "> Net to Investor:  \n"
         "> • Gross Profit: \\$22,500  \n"
         "> • Less Fees: (\\$3,000)  \n"
         "> • Net Profit: **\\$19,500**\n\n"
-        "The \\$19,500 result is only mathematically achievable one way: split the gross "
-        "\\$45,000 profit 50/50 first (\\$22,500 each), then deduct the **full** \\$3,000 fee "
-        "from the investor's \\$22,500. The operator pays \\$0 of the fee and keeps the full "
-        "\\$22,500.\n\n"
-        "**The contradiction to surface with the operator:** in conversation, the operator "
-        "described the fee structure as 'fee comes out first, then we split what's left "
-        "50/50.' That math produces a different number — \\$45,000 minus \\$3,000 equals "
-        "\\$42,000, split 50/50 equals **\\$21,000** to the investor, not \\$19,500. The verbal "
-        "explanation and the document's worked example produce results that are \\$1,500 "
-        "apart per cycle.\n\n"
-        "**What the document language actually says about fees** — total, across the "
-        "entire prospectus and agreement:\n"
+        "The \\$19,500 result is only mathematically achievable one way: the gross "
+        "\\$45,000 profit splits 50/50 first (\\$22,500 each), then the full \\$3,000 fee "
+        "comes off the investor's \\$22,500. The investor pays 100% of the fee; "
+        "GrowthLock pays 0%.\n\n"
+        "In conversation, you described the fee structure differently: 'fee comes out "
+        "first, then we split what's left 50/50.' That math runs: \\$45,000 minus "
+        "\\$3,000 equals \\$42,000, split 50/50 equals **\\$21,000** to investor, not "
+        "\\$19,500. The verbal explanation and the prospectus's worked example produce "
+        "per-cycle results that are \\$1,500 apart.\n\n"
+        "The English language in the document is silent on allocation. The only two "
+        "sentences that touch fees:\n"
         "- Section 9: 'Servicing Fees: 1.75%–4% (pass-through only)'\n"
         "- Section 7.2: 'All servicing fees are passed through at cost'\n\n"
-        "Neither sentence specifies *who* the fee passes through to. The English language "
-        "is silent on allocation; only the math in the worked example points to the "
-        "investor-only interpretation.\n\n"
-        "**The question to put to the operator, with the dollar amounts:** *'Your verbal "
-        "explanation produces \\$21,000 to investor per cycle. The prospectus's worked example "
-        "shows \\$19,500 to investor per cycle. Which is contractually binding? If it is the "
-        "\\$21,000 version, can we add a single sentence to Section 9 of the executed "
-        "agreement that says: \"Servicing fees are deducted from gross partnership profit "
-        "prior to the 50/50 split between Investor and Company\"? That closes the ambiguity "
-        "permanently.'*\n\n"
-        "Per-cycle impact: \\$1,500. Annualized impact: roughly 5 percentage points of return. "
-        "The sidebar toggle lets you flip between the two interpretations and see the "
-        "compounding effect."
+        "Neither specifies *who* the fee passes through to. Only the math in §20.3 "
+        "implies an answer, and it points to the less-favorable interpretation.\n\n"
+        "If the executed agreement operates on the \\$21,000 version, a single sentence "
+        "under Section 9 would close the ambiguity permanently: *Servicing fees are "
+        "deducted from gross partnership profit prior to the 50/50 split between "
+        "Investor and Company.*\n\n"
+        "Per-cycle impact: \\$1,500. Annualized: roughly 5 percentage points of return. "
+        "The sidebar toggle flips between the two interpretations."
     )
 
-    st.markdown("##### 2. Servicing fee basis")
-    st.markdown(
-        "Independent of allocation, the **basis** for the 3% deserves clarification. Per "
-        "operator clarification (May 9 2026), the funder charges **up to 3% of the syndicated amount** — "
-        "i.e., your invested capital. The SVRP example doesn't explicitly say this. On a "
-        "\\$100K investment taking 100% of a \\$100K advance, basis doesn't matter. On a \\$100K "
-        "investment syndicated into 25% of a \\$400K advance, the fee scales with your \\$100K, "
-        "not the \\$400K. The model uses the operator's stated basis (3% of invested capital)."
-    )
-
-    st.markdown("##### 3. Default rate baseline")
+    st.markdown("##### 2. Default rate baseline")
     st.markdown(
         "The prospectus's financial model walks through several annualized return "
         "scenarios (58.5% / 68–75% / 80–100%+) and **none of them include any default "
-        "rate** — every projection assumes 100% of advances repay in full. The operator "
-        "confirmed (May 8 2026 Q&A) that his funders operate against a **10% industry "
-        "baseline default rate**. The prospectus financial model should at minimum "
-        "reference this baseline and ideally show stressed scenarios. Currently it shows "
-        "none."
+        "rate** — every projection assumes 100% of advances repay in full. You "
+        "confirmed (May 8 2026 Q&A) that the funders operate against a 10% industry "
+        "baseline. The model anchors on 10% by default; the slider stress-tests in "
+        "either direction. Adding a baseline reference and a stressed-scenario row to "
+        "the prospectus's financial-model section would close the gap between the "
+        "marketing projections and the underlying reality."
     )
 
-    st.markdown("##### 4. Track record framing")
+    st.markdown("##### 3. Track record framing")
     st.markdown(
-        "The SVRP prospectus presents a 20-deal performance snapshot in language that "
-        "reads like an active syndication track record. The operator confirmed (April 24 "
-        "2026 Q&A) that **external capital under management is zero**. Those deals were "
-        "funded with GrowthLock's own operating capital. The marketing materials should "
-        "disclose this directly rather than requiring an investor to surface it in due "
-        "diligence."
+        "The prospectus presents the 20-deal performance snapshot in language that "
+        "reads like an active syndication track record. You confirmed (April 24 2026 "
+        "Q&A) that external capital under management is zero — those deals were "
+        "funded with GrowthLock's own operating capital. Surfacing that distinction "
+        "directly in the marketing materials would strengthen rather than weaken the "
+        "story: it makes clear the performance data is honest deal-level history "
+        "rather than investor-return history that doesn't yet exist."
     )
 
-    st.markdown("##### 5. Recovery rate not modeled")
+    st.markdown("##### 4. Recovery rate not modeled")
     st.markdown(
-        "**SVRP** doesn't model recovery on defaulted positions at all. **the operator's funders** "
-        "reported 50–80% recovery on actively pursued UCC enforcement. This is a structural "
-        "feature of MCAs that materially softens default impact — and not mentioning it "
-        "in the prospectus understates the program's actual risk-adjusted return profile. "
-        "The model uses 50% as the conservative anchor."
+        "The prospectus doesn't model recovery on defaulted positions at all. Your "
+        "funders reported 50–80% recovery on actively pursued UCC enforcement — a "
+        "structural feature of MCAs that materially softens default impact. Leaving "
+        "it out of the prospectus actually *understates* the program's risk-adjusted "
+        "return profile. Including it would make the stressed scenarios more "
+        "compelling, not less. The model uses 50% as the conservative anchor."
     )
 
-    st.markdown("##### 6. Asymmetric loss allocation")
+    st.markdown("##### 5. Asymmetric loss allocation")
     st.markdown(
-        "The agreement's profit-allocation language reads: 'Return of Investor capital, "
-        "then remaining Net Profits split 50% Investor / 50% Company.' The language is "
-        "silent on **loss allocation** when total returns aren't sufficient to return "
-        "principal in full. The model assumes the conservative interpretation — investor "
-        "absorbs full principal loss while GrowthLock takes 50% of upside only. This is "
-        "asymmetric and should be pinned down in the executed agreement before signing."
+        "The agreement's profit-allocation language reads: 'Return of Investor "
+        "capital, then remaining Net Profits split 50% Investor / 50% Company.' The "
+        "language is silent on loss allocation when total returns don't cover the "
+        "principal-return step. The model assumes the conservative interpretation — "
+        "investor absorbs full principal loss while GrowthLock takes 50% of upside "
+        "only.\n\n"
+        "Worth structurally addressing rather than just clarifying. The **Loss-Sharing "
+        "tab** models two specific mechanisms — chain-profit clawback and origination "
+        "commission rebate — that would close this gap without requiring fresh capital "
+        "from GrowthLock. Both draw from revenue you've already earned (syndication "
+        "profits on prior renewals, origination commissions on the defaulted deal). "
+        "The model lets you dial in the parameters and see the dollar impact on a "
+        "defaulted chain."
     )
 
-    st.markdown("##### 7. Compounding example math")
+    st.markdown("##### 6. Compounding example math")
     st.markdown(
-        "The prospectus's compounding illustration shows: \\$100K → \\$119,500 → \\$142,802 → "
-        "\\$170,608 after three cycles, calling that a 19.5% per-cycle compounding result. "
-        "Spot-checking: 100,000 × 1.195³ = \\$170,648 ✓. The math itself is fine — but it's "
-        "predicated on 19.5% per cycle holding for three consecutive cycles with no "
-        "variance, no defaults, no deployment lag between cycles. That's a marketing "
-        "illustration, not a forecast."
+        "The compounding illustration shows: \\$100K → \\$119,500 → \\$142,802 → "
+        "\\$170,608 after three cycles, labeled a 19.5% per-cycle compounding result. "
+        "The math reconciles cleanly (100,000 × 1.195³ = \\$170,648). The issue is "
+        "framing: it's predicated on 19.5% per cycle holding for three consecutive "
+        "cycles with no variance, no defaults, no deployment lag.\n\n"
+        "Two cleanest ways to close the gap:\n\n"
+        "- **Form 1 — single-sentence fix:** Add a disclaimer below the table: "
+        "*'This illustration assumes 19.5% per cycle held constant for three cycles "
+        "with no defaults, no recovery costs, and immediate redeployment between "
+        "cycles. Realized returns will vary based on default rates, recovery, and "
+        "deployment timing.'* Five-minute change to the document, closes the gap "
+        "honestly.\n"
+        "- **Form 3 — parallel-column treatment:** Add a second 'conservative case' "
+        "column to the same compounding table, with realistic default and recovery "
+        "assumptions. Mirrors the dual-case framing this app uses in its Model tab. "
+        "Structurally cleaner but a bigger lift.\n\n"
+        "Other approaches exist (showing the chart as a range, or pointing investors "
+        "to a modeling tool — see point 4 above) but these two are probably the "
+        "cleanest for GrowthLock to execute on quickly."
     )
 
     st.markdown("---")
     st.caption(
-        "None of these are accusations of bad faith — they read as first-generation "
-        "document gaps. But for someone committing \\$100K–\\$300K (or considering an equity "
-        "position), each one should be resolved in writing."
+        "These read as first-generation document gaps rather than intent. Each is "
+        "something a clarifying sentence in the materials or executed agreement would "
+        "address directly."
     )
 
 # -------- FOOTER --------
 st.markdown("---")
 st.caption(
-    "Model built on documented SVRP terms and operator Q&A responses (April 24, May 8, "
-    "May 9 2026). All projections are non-guaranteed."
+    "Model built on documented SVRP terms and Q&A responses from April 24, May 8, "
+    "and May 9 2026. All projections are non-guaranteed."
 )
