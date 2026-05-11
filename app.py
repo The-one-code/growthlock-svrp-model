@@ -46,7 +46,7 @@ def per_cycle_economics(
         balance via UCC enforcement.
       - Total returned to the deal:
             I * F * [1 - D*(1-T)*(1-R)]
-      - Servicing fee is 3% of *invested capital* (per Chad, May 9 2026):
+      - Servicing fee is 3% of *invested capital* (per operator clarification, May 9 2026):
             I * SF
 
     Fee allocation modes:
@@ -207,13 +207,13 @@ with st.sidebar:
         "Factor rate",
         min_value=1.30, max_value=1.60,
         value=1.45, step=0.01,
-        help="SVRP target 1.40–1.50+. GrowthLock's actual spreadsheet averages ~1.48.",
+        help="SVRP target 1.40–1.50+.",
     )
     cycle_days = st.slider(
         "Cycle duration (days)",
         min_value=60, max_value=180,
         value=110, step=5,
-        help="SVRP target 100–120 days. Spreadsheet average ~96 days.",
+        help="SVRP target 100–120 days.",
     )
 
     st.subheader("Risk model")
@@ -221,7 +221,7 @@ with st.sidebar:
         "Default rate",
         min_value=0.00, max_value=0.30,
         value=0.10, step=0.01,
-        help="Industry baseline per Chad's funders: 10%. SVRP marketing model: 0%.",
+        help="Industry baseline per the operator's funders: 10%. SVRP marketing model: 0%.",
     )
     default_timing = st.slider(
         "Default timing",
@@ -234,7 +234,7 @@ with st.sidebar:
         "Recovery rate on defaulted balance",
         min_value=0.00, max_value=1.00,
         value=0.50, step=0.05,
-        help="Chad's funders cite 50–80% on actively pursued UCC enforcement. "
+        help="the operator's funders cite 50–80% on actively pursued UCC enforcement. "
              "50% = conservative end of their range.",
     )
 
@@ -244,7 +244,7 @@ with st.sidebar:
         min_value=0.0000, max_value=0.0500,
         value=0.0300, step=0.0025,
         format="%.4f",
-        help="Per Chad (May 9 2026): up to 3% of syndicated amount. "
+        help="Per operator clarification (May 9 2026): up to 3% of syndicated amount. "
              "SVRP doc range: 1.75–4% pass-through.",
     )
     fee_allocation_label = st.radio(
@@ -255,22 +255,23 @@ with st.sidebar:
              "GrowthLock pays half. Investor-only: 50/50 split first, then full fee "
              "from investor — GrowthLock pays zero, investor's effective split drops "
              "below 50%. The SVRP example in §20.3 uses the second interpretation. "
-             "Worth pinning Chad down on which one is actually contractual.",
+             "Worth pinning the operator down on which one is actually contractual.",
     )
     fee_allocation = "pre_split" if fee_allocation_label.startswith("Pre") else "investor_only"
 
     st.markdown("---")
     st.markdown("**Default settings = conservative case:**")
     st.markdown(
-        "- 10% default rate (Chad's industry baseline)\n"
-        "- 50% recovery (low end of Chad's 50–80% range)\n"
+        "- 10% default rate (the operator's industry baseline)\n"
+        "- 50% recovery (low end of the operator's 50–80% range)\n"
         "- 50% default timing (mid-cycle)\n"
         "- 3% servicing fee on invested capital\n"
         "- 1.45 factor rate, 110-day cycle"
     )
     st.caption(
-        "GrowthLock's spreadsheet shows zero defaults across 21 deals — better than "
-        "these defaults. That sample is too small to model from."
+        "These defaults represent the realistic case discussed: meaningful default rate, "
+        "moderate recovery, mid-cycle default timing. The SVRP marketing example uses "
+        "zero defaults — that's the dotted reference line in the chart."
     )
 
 # -------- COMPUTE --------
@@ -294,10 +295,9 @@ marketing_annual = annualized(
 )
 
 # -------- TABS --------
-tab_model, tab_sens, tab_actuals, tab_disc = st.tabs([
+tab_model, tab_sens, tab_disc = st.tabs([
     "📊 Model",
     "📈 Sensitivity",
-    "📁 GrowthLock Spreadsheet",
     "⚠️ Discrepancies",
 ])
 
@@ -550,65 +550,6 @@ with tab_sens:
     )
 
 # ============== TAB 3: GROWTHLOCK ACTUALS ==============
-with tab_actuals:
-    st.subheader("GrowthLock's 21-deal performance spreadsheet")
-    st.caption(
-        "Reference data only — the model's defaults intentionally use more conservative "
-        "numbers than this snapshot reflects."
-    )
-
-    deals = pd.DataFrame([
-        {"Merchant": "Colton Williams",       "Funder": "Everest",  "Amount": 25000,  "Factor": 1.56, "Days": 70,  "Status": "Renewed"},
-        {"Merchant": "Colton Williams",       "Funder": "Everest",  "Amount": 38000,  "Factor": 1.49, "Days": 97,  "Status": "Renewed"},
-        {"Merchant": "Adelaida Simpson",      "Funder": "Reliance", "Amount": 75000,  "Factor": 1.49, "Days": 70,  "Status": "Paid Off"},
-        {"Merchant": "David Rucker",          "Funder": "Reliance", "Amount": 100000, "Factor": 1.49, "Days": 120, "Status": "Paid Off"},
-        {"Merchant": "Krisz Hargesheimer",    "Funder": "Simply",   "Amount": 100000, "Factor": 1.49, "Days": 140, "Status": "Paid Off"},
-        {"Merchant": "Montana Mealey",        "Funder": "Reliance", "Amount": 55000,  "Factor": 1.49, "Days": 105, "Status": "Renewed"},
-        {"Merchant": "Aaron Fransua",         "Funder": "Simply",   "Amount": 100000, "Factor": 1.49, "Days": 105, "Status": "Active"},
-        {"Merchant": "Livia Vogel",           "Funder": "Samson",   "Amount": 25000,  "Factor": 1.49, "Days": 91,  "Status": "Paid Off"},
-        {"Merchant": "Livia Vogel",           "Funder": "Everest",  "Amount": 40000,  "Factor": 1.38, "Days": 98,  "Status": "Paid Off"},
-        {"Merchant": "Fernando Reissinger",   "Funder": "Samson",   "Amount": 125000, "Factor": 1.49, "Days": 120, "Status": "Renewing"},
-        {"Merchant": "Rich Rodriguez",        "Funder": "Simply",   "Amount": 100000, "Factor": 1.49, "Days": 90,  "Status": "Renewing"},
-        {"Merchant": "Rich Rodriguez",        "Funder": "LNS",      "Amount": 38000,  "Factor": 1.49, "Days": 98,  "Status": "Active"},
-        {"Merchant": "Rich Rodriguez",        "Funder": "Everest",  "Amount": 45000,  "Factor": 1.48, "Days": 105, "Status": "Active"},
-        {"Merchant": "Christopher Blystone",  "Funder": "LNS",      "Amount": 30000,  "Factor": 1.49, "Days": 90,  "Status": "Renewing"},
-        {"Merchant": "David Harvey",          "Funder": "Vader",    "Amount": 35000,  "Factor": 1.49, "Days": 35,  "Status": "Renewed"},
-        {"Merchant": "David Harvey",          "Funder": "Vader",    "Amount": 47000,  "Factor": 1.47, "Days": 60,  "Status": "Active"},
-        {"Merchant": "David Harvey",          "Funder": "Everest",  "Amount": 85000,  "Factor": 1.49, "Days": 98,  "Status": "Active"},
-        {"Merchant": "Daniel Smith",          "Funder": "On Deck",  "Amount": 125000, "Factor": 1.49, "Days": 98,  "Status": "Paid Off"},
-        {"Merchant": "Daniel Smith",          "Funder": "Simply",   "Amount": 175000, "Factor": 1.47, "Days": 105, "Status": "Active"},
-        {"Merchant": "Craig Mattson",         "Funder": "Simply",   "Amount": 225000, "Factor": 1.48, "Days": 98,  "Status": "Renewed"},
-        {"Merchant": "Craig Mattson",         "Funder": "Simply",   "Amount": 250000, "Factor": 1.44, "Days": 119, "Status": "Active"},
-    ])
-
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total deal volume", f"${deals['Amount'].sum():,.0f}")
-    c2.metric("Avg factor", f"{deals['Factor'].mean():.3f}")
-    c3.metric("Avg cycle", f"{deals['Days'].mean():.0f} days")
-    c4.metric("Stated defaults", "0")
-
-    st.dataframe(
-        deals.style.format({
-            "Amount": "${:,.0f}",
-            "Factor": "{:.2f}",
-            "Days": "{:.0f}",
-        }),
-        use_container_width=True, hide_index=True, height=560,
-    )
-
-    st.info(
-        "**Why the model is more conservative than this snapshot:**\n\n"
-        "1. 21 deals across ~13 merchants is too small a sample to project industry-wide "
-        "default behavior.\n"
-        "2. Chad's own funders cited a 10% default baseline. The snapshot's zero defaults "
-        "is consistent with under-sampling, not with a 0% true rate.\n"
-        "3. The snapshot used GrowthLock's own operating capital — performance under "
-        "external investor pressure and at higher volume may differ.\n"
-        "4. The snapshot's avg cycle of ~96 days is faster than SVRP's stated 100–120 "
-        "day window; the model anchors on the stated window (110 days) to avoid "
-        "over-fitting to a sample that may benefit from cherry-picking."
-    )
-
 # ============== TAB 4: DISCREPANCIES ==============
 with tab_disc:
     st.subheader("Documented discrepancies — SVRP materials vs. our model")
@@ -626,24 +567,24 @@ with tab_disc:
         "The model defaults to the partner-fair interpretation (fee deducted before the "
         "split, both sides bear half). Flip the sidebar toggle to see the prospectus version. "
         "**The toggle changes per-cycle returns by ~1.5 percentage points, which compounds "
-        "to ~5–6 points annually.** Worth pinning Chad down on which interpretation is "
+        "to ~5–6 points annually.** Worth pinning the operator down on which interpretation is "
         "actually contractual before signing."
     )
 
     st.markdown("##### 2. Servicing fee basis")
     st.markdown(
         "Independent of allocation, the **basis** for the 3% deserves clarification. Per "
-        "Chad (May 9 2026), the funder charges **up to 3% of the syndicated amount** — "
+        "operator clarification (May 9 2026), the funder charges **up to 3% of the syndicated amount** — "
         "i.e., your invested capital. The SVRP example doesn't explicitly say this. On a "
         "$100K investment taking 100% of a $100K advance, basis doesn't matter. On a $100K "
         "investment syndicated into 25% of a $400K advance, the fee scales with your $100K, "
-        "not the $400K. The model uses Chad's stated basis (3% of invested capital)."
+        "not the $400K. The model uses the operator's stated basis (3% of invested capital)."
     )
 
     st.markdown("##### 3. Default rate baseline")
     st.markdown(
         "**SVRP Section 20** models zero defaults across the full Annualized Velocity Model "
-        "(58.5% / 68–75% / 80–100%+ projections). **Chad confirmed** (May 8 2026 Q&A) that "
+        "(58.5% / 68–75% / 80–100%+ projections). **the operator confirmed** (May 8 2026 Q&A) that "
         "his funders operate against a **10% industry baseline default rate**. The prospectus "
         "financial model should at minimum reference this baseline and ideally show stressed "
         "scenarios. Currently it shows none."
@@ -652,7 +593,7 @@ with tab_disc:
     st.markdown("##### 4. Track record framing")
     st.markdown(
         "**SVRP prospectus** presents the 20-deal performance snapshot in language that "
-        "reads like an active syndication track record. **Chad confirmed** (April 24 2026 Q&A) "
+        "reads like an active syndication track record. **the operator confirmed** (April 24 2026 Q&A) "
         "that **external capital under management is zero**. Those deals were funded with "
         "GrowthLock's own operating capital. The marketing materials should disclose this "
         "directly rather than requiring an investor to surface it in due diligence."
@@ -660,7 +601,7 @@ with tab_disc:
 
     st.markdown("##### 5. Recovery rate not modeled")
     st.markdown(
-        "**SVRP** doesn't model recovery on defaulted positions at all. **Chad's funders** "
+        "**SVRP** doesn't model recovery on defaulted positions at all. **the operator's funders** "
         "reported 50–80% recovery on actively pursued UCC enforcement. This is a structural "
         "feature of MCAs that materially softens default impact — and not mentioning it "
         "in the prospectus understates the program's actual risk-adjusted return profile. "
@@ -695,6 +636,6 @@ with tab_disc:
 # -------- FOOTER --------
 st.markdown("---")
 st.caption(
-    "Model built on documented SVRP terms, Chad's Q&A responses (April 24, May 8, May 9 "
-    "2026), and the 21-deal performance spreadsheet. All projections are non-guaranteed."
+    "Model built on documented SVRP terms and operator Q&A responses (April 24, May 8, "
+    "May 9 2026). All projections are non-guaranteed."
 )
