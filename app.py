@@ -4,8 +4,8 @@ GrowthLock SVRP Return Model
 Interactive return model for the Syndication Velocity Returns Program.
 
 Defaults reflect the conservative scenario discussed (10% default rate,
-50% recovery, 50% default timing, 3% servicing fee, 1.45 factor, 110-day
-cycles). Sliders allow stress-testing in either direction.
+50% recovery, 50% of payments collected before default, 3% servicing fee,
+1.45 factor, 110-day cycles). Sliders allow stress-testing in either direction.
 
 Run locally:    streamlit run app.py
 Deploy free:    Push to GitHub → connect at https://streamlit.io/cloud
@@ -202,7 +202,7 @@ with st.sidebar:
         min_value=100_000, max_value=300_000,
         value=100_000, step=10_000,
         format="$%d",
-        help="SVRP minimum $100K, maximum $300K.",
+        help="SVRP minimum \\$100K, maximum \\$300K.",
     )
     factor_rate = st.slider(
         "Factor rate",
@@ -218,36 +218,46 @@ with st.sidebar:
     )
 
     st.subheader("Risk model")
-    default_rate = st.slider(
+    default_rate_pct = st.slider(
         "Default rate",
-        min_value=0.00, max_value=0.30,
-        value=0.10, step=0.01,
+        min_value=0, max_value=30,
+        value=10, step=1,
+        format="%d%%",
         help="Industry baseline per the operator's funders: 10%. SVRP marketing model: 0%.",
     )
-    default_timing = st.slider(
-        "Default timing",
-        min_value=0.00, max_value=1.00,
-        value=0.50, step=0.05,
-        help="Fraction of scheduled payments collected before the merchant defaults. "
-             "Later defaults = less remaining balance at risk.",
+    default_rate = default_rate_pct / 100
+
+    default_timing_pct = st.slider(
+        "Payments collected before default",
+        min_value=0, max_value=100,
+        value=50, step=5,
+        format="%d%%",
+        help="Of the merchant's scheduled total payback, how much they pay before defaulting. "
+             "0% = default on day one (worst case). 100% = full repayment (no default). "
+             "Higher values mean less remaining balance is at risk when the default occurs.",
     )
-    recovery_rate = st.slider(
+    default_timing = default_timing_pct / 100
+
+    recovery_rate_pct = st.slider(
         "Recovery rate on defaulted balance",
-        min_value=0.00, max_value=1.00,
-        value=0.50, step=0.05,
-        help="the operator's funders cite 50–80% on actively pursued UCC enforcement. "
+        min_value=0, max_value=100,
+        value=50, step=5,
+        format="%d%%",
+        help="The operator's funders cite 50–80% on actively pursued UCC enforcement. "
              "50% = conservative end of their range.",
     )
+    recovery_rate = recovery_rate_pct / 100
 
     st.subheader("Fees")
-    servicing_fee = st.slider(
+    servicing_fee_pct = st.slider(
         "Servicing fee (% of invested capital)",
-        min_value=0.0000, max_value=0.0500,
-        value=0.0300, step=0.0025,
-        format="%.4f",
+        min_value=0.00, max_value=5.00,
+        value=3.00, step=0.25,
+        format="%.2f%%",
         help="Per operator clarification (May 9 2026): up to 3% of syndicated amount. "
              "SVRP doc range: 1.75–4% pass-through.",
     )
+    servicing_fee = servicing_fee_pct / 100
     fee_allocation_label = st.radio(
         "Fee allocation",
         options=["Pre-split (partner-fair)", "Investor-only (per prospectus math)"],
@@ -264,15 +274,15 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Default settings = conservative case:**")
     st.markdown(
-        "- 10% default rate (the operator's industry baseline)\n"
+        "- 10% default rate (the operator's stated industry baseline)\n"
         "- 50% recovery (low end of the operator's 50–80% range)\n"
-        "- 50% default timing (mid-cycle)\n"
+        "- 50% payments collected before default (mid-cycle)\n"
         "- 3% servicing fee on invested capital\n"
         "- 1.45 factor rate, 110-day cycle"
     )
     st.caption(
         "These defaults represent the realistic case discussed: meaningful default rate, "
-        "moderate recovery, mid-cycle default timing. The SVRP marketing example uses "
+        "moderate recovery, mid-cycle default point. The SVRP marketing example uses "
         "zero defaults — that's the dotted reference line in the chart."
     )
 
@@ -346,7 +356,7 @@ with tab_model:
     if single["capital_lost"] > 0:
         st.error(
             f"⚠️ This scenario produces a **per-cycle loss of "
-            f"${single['capital_lost']:,.0f}** ({single['capital_lost']/investment*100:.1f}% of capital). "
+            f"\\${single['capital_lost']:,.0f}** ({single['capital_lost']/investment*100:.1f}% of capital). "
             f"In compounding mode, that loss compounds against you."
         )
 
@@ -381,13 +391,13 @@ with tab_model:
         )
         if annual["distribution_erosion"] > 0:
             st.warning(
-                f"Principal eroded by **${annual['distribution_erosion']:,.0f}** "
+                f"Principal eroded by **\\${annual['distribution_erosion']:,.0f}** "
                 f"({annual['distribution_erosion']/investment*100:.1f}%) — "
                 f"per-cycle losses exceeded distributable profit."
             )
         else:
             st.caption(
-                f"Capital stays at ${investment:,.0f}; profits paid out cycle-by-cycle."
+                f"Capital stays at \\${investment:,.0f}; profits paid out cycle-by-cycle."
             )
 
     st.markdown("---")
@@ -467,8 +477,9 @@ with tab_sens:
     st.subheader("Sensitivity — annual return (compounding)")
     st.caption(
         f"Holding: factor {factor_rate:.2f}, cycle {cycle_days}d, "
-        f"timing {default_timing*100:.0f}%, fee {servicing_fee*100:.2f}%, "
-        f"investment ${investment:,.0f}"
+        f"timing: default after {default_timing*100:.0f}% of payments, "
+        f"fee {servicing_fee*100:.2f}%, "
+        f"investment \\${investment:,.0f}"
     )
 
     d_grid = [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
@@ -508,7 +519,7 @@ with tab_sens:
     st.markdown("---")
     st.subheader("Sensitivity — per-cycle return")
     st.caption(
-        f"Factor rate × default rate, holding timing {default_timing*100:.0f}%, "
+        f"Factor rate × default rate, holding default after {default_timing*100:.0f}% of payments, "
         f"recovery {recovery_rate*100:.0f}%, fee {servicing_fee*100:.2f}%"
     )
     f_grid = [1.30, 1.35, 1.40, 1.45, 1.50, 1.55, 1.60]
@@ -566,20 +577,20 @@ with tab_disc:
         "The prospectus's financial-model section (subsection 20.3, 'Net Return After "
         "Fees') is the only place in the entire document where the actual return math "
         "is worked out with dollar figures. Here is the literal example, verbatim:\n\n"
-        "> Assume: Servicing Fee: 3% ($3,000)  \n"
+        "> Assume: Servicing Fee: 3% (\\$3,000)  \n"
         "> Net to Investor:  \n"
-        "> • Gross Profit: $22,500  \n"
-        "> • Less Fees: ($3,000)  \n"
-        "> • Net Profit: **$19,500**\n\n"
-        "The $19,500 result is only mathematically achievable one way: split the gross "
-        "$45,000 profit 50/50 first ($22,500 each), then deduct the **full** $3,000 fee "
-        "from the investor's $22,500. The operator pays $0 of the fee and keeps the full "
-        "$22,500.\n\n"
+        "> • Gross Profit: \\$22,500  \n"
+        "> • Less Fees: (\\$3,000)  \n"
+        "> • Net Profit: **\\$19,500**\n\n"
+        "The \\$19,500 result is only mathematically achievable one way: split the gross "
+        "\\$45,000 profit 50/50 first (\\$22,500 each), then deduct the **full** \\$3,000 fee "
+        "from the investor's \\$22,500. The operator pays \\$0 of the fee and keeps the full "
+        "\\$22,500.\n\n"
         "**The contradiction to surface with the operator:** in conversation, the operator "
         "described the fee structure as 'fee comes out first, then we split what's left "
-        "50/50.' That math produces a different number — $45,000 minus $3,000 equals "
-        "$42,000, split 50/50 equals **$21,000** to the investor, not $19,500. The verbal "
-        "explanation and the document's worked example produce results that are $1,500 "
+        "50/50.' That math produces a different number — \\$45,000 minus \\$3,000 equals "
+        "\\$42,000, split 50/50 equals **\\$21,000** to the investor, not \\$19,500. The verbal "
+        "explanation and the document's worked example produce results that are \\$1,500 "
         "apart per cycle.\n\n"
         "**What the document language actually says about fees** — total, across the "
         "entire prospectus and agreement:\n"
@@ -589,13 +600,13 @@ with tab_disc:
         "is silent on allocation; only the math in the worked example points to the "
         "investor-only interpretation.\n\n"
         "**The question to put to the operator, with the dollar amounts:** *'Your verbal "
-        "explanation produces $21,000 to investor per cycle. The prospectus's worked example "
-        "shows $19,500 to investor per cycle. Which is contractually binding? If it is the "
-        "$21,000 version, can we add a single sentence to Section 9 of the executed "
+        "explanation produces \\$21,000 to investor per cycle. The prospectus's worked example "
+        "shows \\$19,500 to investor per cycle. Which is contractually binding? If it is the "
+        "\\$21,000 version, can we add a single sentence to Section 9 of the executed "
         "agreement that says: \"Servicing fees are deducted from gross partnership profit "
         "prior to the 50/50 split between Investor and Company\"? That closes the ambiguity "
         "permanently.'*\n\n"
-        "Per-cycle impact: $1,500. Annualized impact: roughly 5 percentage points of return. "
+        "Per-cycle impact: \\$1,500. Annualized impact: roughly 5 percentage points of return. "
         "The sidebar toggle lets you flip between the two interpretations and see the "
         "compounding effect."
     )
@@ -605,9 +616,9 @@ with tab_disc:
         "Independent of allocation, the **basis** for the 3% deserves clarification. Per "
         "operator clarification (May 9 2026), the funder charges **up to 3% of the syndicated amount** — "
         "i.e., your invested capital. The SVRP example doesn't explicitly say this. On a "
-        "$100K investment taking 100% of a $100K advance, basis doesn't matter. On a $100K "
-        "investment syndicated into 25% of a $400K advance, the fee scales with your $100K, "
-        "not the $400K. The model uses the operator's stated basis (3% of invested capital)."
+        "\\$100K investment taking 100% of a \\$100K advance, basis doesn't matter. On a \\$100K "
+        "investment syndicated into 25% of a \\$400K advance, the fee scales with your \\$100K, "
+        "not the \\$400K. The model uses the operator's stated basis (3% of invested capital)."
     )
 
     st.markdown("##### 3. Default rate baseline")
@@ -652,9 +663,9 @@ with tab_disc:
 
     st.markdown("##### 7. Compounding example math")
     st.markdown(
-        "The prospectus's compounding illustration shows: $100K → $119,500 → $142,802 → "
-        "$170,608 after three cycles, calling that a 19.5% per-cycle compounding result. "
-        "Spot-checking: 100,000 × 1.195³ = $170,648 ✓. The math itself is fine — but it's "
+        "The prospectus's compounding illustration shows: \\$100K → \\$119,500 → \\$142,802 → "
+        "\\$170,608 after three cycles, calling that a 19.5% per-cycle compounding result. "
+        "Spot-checking: 100,000 × 1.195³ = \\$170,648 ✓. The math itself is fine — but it's "
         "predicated on 19.5% per cycle holding for three consecutive cycles with no "
         "variance, no defaults, no deployment lag between cycles. That's a marketing "
         "illustration, not a forecast."
@@ -663,7 +674,7 @@ with tab_disc:
     st.markdown("---")
     st.caption(
         "None of these are accusations of bad faith — they read as first-generation "
-        "document gaps. But for someone committing $100K–$300K (or considering an equity "
+        "document gaps. But for someone committing \\$100K–\\$300K (or considering an equity "
         "position), each one should be resolved in writing."
     )
 
