@@ -52,13 +52,14 @@ def per_cycle_economics(
     Fee allocation modes:
       - "pre_split" (partner-fair): fee deducted from partnership pool,
         then 50/50 split of net. GrowthLock pays half the fee implicitly.
-      - "investor_only" (prospectus-style, per SVRP Section 20.3):
-        50/50 split of gross profit first, then full fee from investor only.
-        GrowthLock pays zero fees; investor's effective split drops below 50%.
+      - "investor_only" (per the prospectus's worked example, subsection
+        20.3 "Net Return After Fees"): 50/50 split of gross profit first,
+        then full fee from investor only. GrowthLock pays zero fees;
+        investor's effective split drops below 50%.
 
     Principal loss (when gross P&L is negative) is absorbed 100% by investor
-    in both modes — per SVRP Section 5.3's silence on loss allocation,
-    interpreted conservatively.
+    in both modes — the agreement is silent on loss allocation when returns
+    are insufficient to return principal, interpreted conservatively here.
     """
     I = float(investment)
     F = float(factor)
@@ -81,7 +82,7 @@ def per_cycle_economics(
         else:
             investor_pnl = net_pool
             growthlock_pnl = 0.0
-    else:  # investor_only — prospectus Section 20.3 style
+    else:  # investor_only — per the prospectus's worked example
         # 50/50 split first, then full fee deducted from investor share
         if gross_pnl >= 0:
             growthlock_pnl = 0.5 * gross_pnl
@@ -249,12 +250,13 @@ with st.sidebar:
     )
     fee_allocation_label = st.radio(
         "Fee allocation",
-        options=["Pre-split (partner-fair)", "Investor-only (prospectus §20.3)"],
+        options=["Pre-split (partner-fair)", "Investor-only (per prospectus math)"],
         index=0,
         help="Pre-split: fee comes out of partnership pool before the 50/50 split — "
              "GrowthLock pays half. Investor-only: 50/50 split first, then full fee "
              "from investor — GrowthLock pays zero, investor's effective split drops "
-             "below 50%. The SVRP example in §20.3 uses the second interpretation. "
+             "below 50%. The prospectus's worked example in its financial-model section "
+             "(20.3, 'Net Return After Fees') uses the second interpretation. "
              "Worth pinning the operator down on which one is actually contractual.",
     )
     fee_allocation = "pre_split" if fee_allocation_label.startswith("Pre") else "investor_only"
@@ -313,7 +315,7 @@ with tab_model:
         )
     else:
         st.warning(
-            f"**Fee allocation: investor-only (per SVRP §20.3).** "
+            f"**Fee allocation: investor-only (per the prospectus's worked example).** "
             f"Effective investor share of profit: "
             f"**{single['effective_investor_share_pct']*100:.1f}%** — "
             f"below the stated 50/50 split because investor pays full servicing fee. "
@@ -552,23 +554,50 @@ with tab_sens:
 # ============== TAB 3: GROWTHLOCK ACTUALS ==============
 # ============== TAB 4: DISCREPANCIES ==============
 with tab_disc:
-    st.subheader("Documented discrepancies — SVRP materials vs. our model")
+    st.subheader("Documented discrepancies — prospectus materials vs. conservative model")
+    st.caption(
+        "These are the gaps between what the SVRP prospectus and verbal Q&A "
+        "communicate, and what a conservative read of the same materials produces. "
+        "Each one should be resolved in writing before signing."
+    )
 
-    st.markdown("##### 1. Servicing fee allocation — the biggest one")
+    st.markdown("##### 1. Servicing fee allocation — the biggest discrepancy")
     st.markdown(
-        "**SVRP Section 20.3** computes the investor's net like this on a $100K example: "
-        "gross profit $45,000 → 50/50 split → $22,500 each → less $3,000 fee → "
-        "investor net $19,500. The fee is loaded **entirely onto the investor**, after "
-        "the 50/50 split. Under this allocation:\n\n"
-        "- Investor's effective share of profit: **43.3%**, not 50%\n"
-        "- GrowthLock's effective share: **50%** (pays zero fees)\n"
-        "- The phrase '50/50 net of pass-through fees' in the marketing copy is "
-        "technically true but doesn't read like what the math actually does\n\n"
-        "The model defaults to the partner-fair interpretation (fee deducted before the "
-        "split, both sides bear half). Flip the sidebar toggle to see the prospectus version. "
-        "**The toggle changes per-cycle returns by ~1.5 percentage points, which compounds "
-        "to ~5–6 points annually.** Worth pinning the operator down on which interpretation is "
-        "actually contractual before signing."
+        "The prospectus's financial-model section (subsection 20.3, 'Net Return After "
+        "Fees') is the only place in the entire document where the actual return math "
+        "is worked out with dollar figures. Here is the literal example, verbatim:\n\n"
+        "> Assume: Servicing Fee: 3% ($3,000)  \n"
+        "> Net to Investor:  \n"
+        "> • Gross Profit: $22,500  \n"
+        "> • Less Fees: ($3,000)  \n"
+        "> • Net Profit: **$19,500**\n\n"
+        "The $19,500 result is only mathematically achievable one way: split the gross "
+        "$45,000 profit 50/50 first ($22,500 each), then deduct the **full** $3,000 fee "
+        "from the investor's $22,500. The operator pays $0 of the fee and keeps the full "
+        "$22,500.\n\n"
+        "**The contradiction to surface with the operator:** in conversation, the operator "
+        "described the fee structure as 'fee comes out first, then we split what's left "
+        "50/50.' That math produces a different number — $45,000 minus $3,000 equals "
+        "$42,000, split 50/50 equals **$21,000** to the investor, not $19,500. The verbal "
+        "explanation and the document's worked example produce results that are $1,500 "
+        "apart per cycle.\n\n"
+        "**What the document language actually says about fees** — total, across the "
+        "entire prospectus and agreement:\n"
+        "- Section 9: 'Servicing Fees: 1.75%–4% (pass-through only)'\n"
+        "- Section 7.2: 'All servicing fees are passed through at cost'\n\n"
+        "Neither sentence specifies *who* the fee passes through to. The English language "
+        "is silent on allocation; only the math in the worked example points to the "
+        "investor-only interpretation.\n\n"
+        "**The question to put to the operator, with the dollar amounts:** *'Your verbal "
+        "explanation produces $21,000 to investor per cycle. The prospectus's worked example "
+        "shows $19,500 to investor per cycle. Which is contractually binding? If it is the "
+        "$21,000 version, can we add a single sentence to Section 9 of the executed "
+        "agreement that says: \"Servicing fees are deducted from gross partnership profit "
+        "prior to the 50/50 split between Investor and Company\"? That closes the ambiguity "
+        "permanently.'*\n\n"
+        "Per-cycle impact: $1,500. Annualized impact: roughly 5 percentage points of return. "
+        "The sidebar toggle lets you flip between the two interpretations and see the "
+        "compounding effect."
     )
 
     st.markdown("##### 2. Servicing fee basis")
@@ -583,20 +612,23 @@ with tab_disc:
 
     st.markdown("##### 3. Default rate baseline")
     st.markdown(
-        "**SVRP Section 20** models zero defaults across the full Annualized Velocity Model "
-        "(58.5% / 68–75% / 80–100%+ projections). **the operator confirmed** (May 8 2026 Q&A) that "
-        "his funders operate against a **10% industry baseline default rate**. The prospectus "
-        "financial model should at minimum reference this baseline and ideally show stressed "
-        "scenarios. Currently it shows none."
+        "The prospectus's financial model walks through several annualized return "
+        "scenarios (58.5% / 68–75% / 80–100%+) and **none of them include any default "
+        "rate** — every projection assumes 100% of advances repay in full. The operator "
+        "confirmed (May 8 2026 Q&A) that his funders operate against a **10% industry "
+        "baseline default rate**. The prospectus financial model should at minimum "
+        "reference this baseline and ideally show stressed scenarios. Currently it shows "
+        "none."
     )
 
     st.markdown("##### 4. Track record framing")
     st.markdown(
-        "**SVRP prospectus** presents the 20-deal performance snapshot in language that "
-        "reads like an active syndication track record. **the operator confirmed** (April 24 2026 Q&A) "
-        "that **external capital under management is zero**. Those deals were funded with "
-        "GrowthLock's own operating capital. The marketing materials should disclose this "
-        "directly rather than requiring an investor to surface it in due diligence."
+        "The SVRP prospectus presents a 20-deal performance snapshot in language that "
+        "reads like an active syndication track record. The operator confirmed (April 24 "
+        "2026 Q&A) that **external capital under management is zero**. Those deals were "
+        "funded with GrowthLock's own operating capital. The marketing materials should "
+        "disclose this directly rather than requiring an investor to surface it in due "
+        "diligence."
     )
 
     st.markdown("##### 5. Recovery rate not modeled")
@@ -610,27 +642,29 @@ with tab_disc:
 
     st.markdown("##### 6. Asymmetric loss allocation")
     st.markdown(
-        "Per **Section 5.3**: principal returned first, profits split 50/50. The language "
-        "is silent on loss allocation when there isn't enough to return principal in full. "
-        "The model assumes the conservative interpretation — investor absorbs full principal "
-        "loss while GrowthLock takes 50% of upside only. This is asymmetric and should be "
-        "pinned down in the executed agreement before signing."
+        "The agreement's profit-allocation language reads: 'Return of Investor capital, "
+        "then remaining Net Profits split 50% Investor / 50% Company.' The language is "
+        "silent on **loss allocation** when total returns aren't sufficient to return "
+        "principal in full. The model assumes the conservative interpretation — investor "
+        "absorbs full principal loss while GrowthLock takes 50% of upside only. This is "
+        "asymmetric and should be pinned down in the executed agreement before signing."
     )
 
-    st.markdown("##### 7. Compounding example math (Section 20.6)")
+    st.markdown("##### 7. Compounding example math")
     st.markdown(
-        "**SVRP Section 20.6** shows: $100K → $119,500 → $142,802 → $170,608 after three "
-        "cycles, calling that a 19.5% per-cycle compounding result. Spot-checking: "
-        "100,000 × 1.195³ = $170,648 ✓. The math itself is fine — but it's predicated on "
-        "19.5% per cycle holding for three consecutive cycles with no variance, no defaults, "
-        "no deployment lag between cycles. That's a marketing illustration, not a forecast."
+        "The prospectus's compounding illustration shows: $100K → $119,500 → $142,802 → "
+        "$170,608 after three cycles, calling that a 19.5% per-cycle compounding result. "
+        "Spot-checking: 100,000 × 1.195³ = $170,648 ✓. The math itself is fine — but it's "
+        "predicated on 19.5% per cycle holding for three consecutive cycles with no "
+        "variance, no defaults, no deployment lag between cycles. That's a marketing "
+        "illustration, not a forecast."
     )
 
     st.markdown("---")
     st.caption(
         "None of these are accusations of bad faith — they read as first-generation "
         "document gaps. But for someone committing $100K–$300K (or considering an equity "
-        "position), each should be resolved in writing."
+        "position), each one should be resolved in writing."
     )
 
 # -------- FOOTER --------
