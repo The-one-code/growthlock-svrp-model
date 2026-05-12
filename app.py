@@ -476,12 +476,19 @@ with tab_model:
 
 # ============== TAB 2: SENSITIVITY ==============
 with tab_sens:
-    st.subheader("Sensitivity — annual return (compounding)")
-    st.caption(
-        f"Holding: factor {factor_rate:.2f}, cycle {cycle_days}d, "
-        f"timing: default after {default_timing*100:.0f}% of payments, "
-        f"fee {servicing_fee*100:.2f}%, "
-        f"investment \\${investment:,.0f}"
+    st.subheader("Sensitivity — annualized return (compounding)")
+    st.markdown(
+        "**How to read this:** each cell is the projected annual return percentage "
+        "if the default rate is the value on the **left side** and the recovery rate "
+        "is the value on the **top**. Green cells = higher returns. Red cells = "
+        "worse outcomes. The deeper red anything gets, the more capital you're "
+        "losing per year."
+    )
+    st.markdown(
+        f"*Other inputs held constant at sidebar values: factor rate "
+        f"{factor_rate:.2f}, cycle {cycle_days} days, default occurs after "
+        f"{default_timing*100:.0f}% of payments, fee {servicing_fee*100:.2f}%, "
+        f"investment \\${investment:,.0f}.*"
     )
 
     d_grid = [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
@@ -506,23 +513,31 @@ with tab_sens:
         zmid=0,
         text=[[f"{v:.0f}%" for v in row] for row in matrix],
         texttemplate="%{text}",
-        textfont={"size": 13},
-        colorbar=dict(title="Annual %"),
+        textfont={"size": 14},
+        colorbar=dict(title=dict(text="Annual<br>return %", side="right")),
     ))
     fig_h.update_layout(
-        height=440,
+        height=460,
         margin=dict(l=10, r=10, t=10, b=10),
-        xaxis_title="Recovery rate →",
-        yaxis_title="Default rate ↓",
+        xaxis_title="Recovery rate on defaulted balance →",
+        yaxis_title="Default rate (% of cycles that default) ↓",
         yaxis=dict(autorange="reversed"),
+        xaxis=dict(side="top"),
     )
     st.plotly_chart(fig_h, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("Sensitivity — per-cycle return")
-    st.caption(
-        f"Factor rate × default rate, holding default after {default_timing*100:.0f}% of payments, "
-        f"recovery {recovery_rate*100:.0f}%, fee {servicing_fee*100:.2f}%"
+    st.subheader("Sensitivity — single-cycle return")
+    st.markdown(
+        "**How to read this:** each cell is the investor's return for one cycle "
+        "at the factor rate (top) and default rate (left). This is the underlying "
+        "per-cycle math — multiply by cycles per year (~3.3 at default settings) "
+        "to estimate annualized returns."
+    )
+    st.markdown(
+        f"*Other inputs held constant: default occurs after "
+        f"{default_timing*100:.0f}% of payments, recovery "
+        f"{recovery_rate*100:.0f}%, fee {servicing_fee*100:.2f}%.*"
     )
     f_grid = [1.30, 1.35, 1.40, 1.45, 1.50, 1.55, 1.60]
     matrix2 = []
@@ -544,27 +559,27 @@ with tab_sens:
         zmid=0,
         text=[[f"{v:.1f}%" for v in row] for row in matrix2],
         texttemplate="%{text}",
-        textfont={"size": 12},
-        colorbar=dict(title="Per-cycle %"),
+        textfont={"size": 13},
+        colorbar=dict(title=dict(text="Per-cycle<br>return %", side="right")),
     ))
     fig_h2.update_layout(
-        height=440,
+        height=460,
         margin=dict(l=10, r=10, t=10, b=10),
         xaxis_title="Factor rate →",
-        yaxis_title="Default rate ↓",
+        yaxis_title="Default rate (% of cycles that default) ↓",
         yaxis=dict(autorange="reversed"),
+        xaxis=dict(side="top"),
     )
     st.plotly_chart(fig_h2, use_container_width=True)
 
     st.info(
-        "**Read these heatmaps left-to-right and top-to-bottom.** The MCA structure has "
-        "wide downside tolerance — even at 20% default rates with 25% recovery, the factor "
-        "rate spread is wide enough that returns stay positive in most cells. The factor "
-        "rate matters more than people expect; a move from 1.45 to 1.50 covers a lot of "
-        "default risk."
+        "**Takeaway from these charts.** The MCA structure has wide downside "
+        "tolerance — even at 20% default rates with 25% recovery, the factor rate "
+        "spread is wide enough that returns stay positive in most cells. The factor "
+        "rate matters more than people expect; a move from 1.45 to 1.50 covers a "
+        "lot of default risk."
     )
 
-# ============== TAB 3: GROWTHLOCK ACTUALS ==============
 # ============== TAB 3: LOSS-SHARING MECHANISMS ==============
 with tab_loss:
     st.subheader("Loss-sharing mechanisms — modeling investor protection")
@@ -746,60 +761,93 @@ with tab_loss:
 
         st.markdown("---")
         st.markdown("##### Final investor position — unprotected vs. protected")
+        st.markdown(
+            "Bars show the investor's net dollar position across the full chain. "
+            "The percentage in parentheses is the cumulative return on the "
+            f"\\${investment:,.0f} deployed each cycle (not annualized)."
+        )
 
         scenarios = ["Unprotected", "With Mechanism A only", "With Mechanism B only", "With A + B combined"]
         values = [unprotected_net, with_a_net, with_b_net, combined_net]
+        return_pcts = [v / investment * 100.0 for v in values]
         colors = ["#DC2626" if v < 0 else "#1D9E75" for v in values]
+        text_labels = [
+            f"${v:,.0f}<br>({p:+.1f}%)"
+            for v, p in zip(values, return_pcts)
+        ]
 
         fig = go.Figure(go.Bar(
             x=scenarios,
             y=values,
-            text=[f"${v:,.0f}" for v in values],
+            text=text_labels,
             textposition="outside",
             marker_color=colors,
         ))
         fig.add_hline(y=0, line_color="gray", line_width=1)
         fig.update_layout(
-            height=420,
-            margin=dict(l=10, r=10, t=30, b=10),
-            yaxis_title="Investor net position across full chain ($)",
+            height=460,
+            margin=dict(l=10, r=10, t=40, b=10),
+            yaxis_title="Investor net position across chain ($)",
             yaxis_tickformat="$,.0f",
             xaxis_title="",
             showlegend=False,
         )
         st.plotly_chart(fig, use_container_width=True)
 
+        # Approximate annualized return note
+        chain_days_approx = chain_length * cycle_days
+        chain_years_approx = chain_days_approx / 365.0
+        if chain_years_approx > 0:
+            annualized_combined = (
+                ((combined_net / investment + 1.0) ** (1.0 / chain_years_approx) - 1.0) * 100.0
+                if combined_net > -investment else None
+            )
+            annualized_unprotected = (
+                ((unprotected_net / investment + 1.0) ** (1.0 / chain_years_approx) - 1.0) * 100.0
+                if unprotected_net > -investment else None
+            )
+
         improvement = combined_net - unprotected_net
         pct_improvement = (improvement / investor_loss * 100) if investor_loss > 0 else 0
         if improvement > 0:
+            ann_note = ""
+            if annualized_combined is not None and annualized_unprotected is not None:
+                ann_note = (
+                    f" Annualized over the ~{chain_days_approx}-day chain duration, "
+                    f"that's roughly {annualized_unprotected:+.1f}% unprotected vs. "
+                    f"{annualized_combined:+.1f}% with both mechanisms."
+                )
             st.success(
                 f"**Combined A + B improves the investor's net position by "
                 f"${improvement:,.0f}** in this scenario — recovering "
                 f"{pct_improvement:.0f}% of the cycle-N loss. Net position moves from "
-                f"${unprotected_net:,.0f} (unprotected) to ${combined_net:,.0f} "
-                f"(with both mechanisms)."
+                f"${unprotected_net:,.0f} ({unprotected_net/investment*100:+.1f}% return) "
+                f"to ${combined_net:,.0f} ({combined_net/investment*100:+.1f}% return)."
+                f"{ann_note}"
             )
 
     st.markdown("---")
     st.markdown("##### Notes on the mechanics")
     st.markdown(
-        "- **Cohort scope.** As discussed, this would apply to a limited early cohort "
-        "(e.g., the first five investors at \\$100K+ minimum) rather than every "
-        "investor. Keeps GrowthLock's maximum exposure bounded and rewards early "
-        "adopters specifically.\n"
-        "- **Commission clawback window.** Per Q&A, the funder has a 30–45 day "
-        "clawback window on origination commissions. If a default occurs within that "
-        "window, the commission is returned to the funder and Mechanism B has nothing "
-        "to rebate. For default timing above ~30% on a 110-day cycle, the commission "
-        "is retained and B applies. The model doesn't enforce this — set Mechanism B "
-        "to 0% to simulate an in-window default.\n"
-        "- **Chain definition matters.** A chain is a continuous renewal sequence. "
-        "If a borrower pays off in full and comes back later for a new deal, that "
-        "starts a new chain — Mechanism A's clawback applies only within a single "
-        "chain.\n"
-        "- **Caps.** Each mechanism's transfer is capped at the investor's actual "
-        "loss, so neither mechanism overpays. The combined version applies A first, "
-        "then B against the remaining loss after A."
+        "- **Cohort scope.** As discussed, this would apply to a limited early "
+        "cohort (e.g., the first five investors at \\$100K+ minimum) rather than "
+        "every investor. Keeps GrowthLock's maximum exposure bounded and rewards "
+        "early adopters specifically.\n"
+        "- **Commission clawback window.** The funder has a 30–45 calendar-day "
+        "clawback window on origination commissions, measured from the date the "
+        "deal funds. If a default happens within that first 30–45 days, the "
+        "commission is returned to the funder and Mechanism B has nothing to "
+        "rebate. For renewal defaults (chain length > 1), this is rarely an issue "
+        "since renewals typically default well after origination. If modeling an "
+        "early-default scenario specifically, set Mechanism B to 0% to remove the "
+        "commission from the math.\n"
+        "- **Chain definition.** A chain is a continuous renewal sequence on the "
+        "same borrower. If a borrower pays off in full and comes back later for a "
+        "new deal, that starts a new chain — Mechanism A's clawback only applies "
+        "within a single chain, not across separate funding histories.\n"
+        "- **Transfer caps.** Each mechanism's transfer is capped at the "
+        "investor's actual loss, so neither mechanism overpays. The combined "
+        "version applies A first, then B against the remaining loss after A."
     )
 
 
